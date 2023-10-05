@@ -1,6 +1,6 @@
 import stat
 import pickle
-from files import FileReader
+from .files import FileReader
 
 class XferSender(object):
     def __init__(self, seg_len:int, reader:FileReader) -> None:
@@ -66,17 +66,18 @@ class XferReceiver(object):
                 continue
 
             if self.status == 'data': # do not fill buffer when xfer data
+                if self.remain_bytes == 0:
+                    self.status = 'pre_meta'
+                    self.remain_bytes = 4
+                    yield bytes()
+                    continue
+
                 rlen = min(self.remain_bytes, data_remain)
                 start_ind = data_len - data_remain
                 self.remain_bytes -= rlen
                 data_remain -= rlen
 
                 yield data[start_ind: + rlen]
-
-                if self.remain_bytes == 0:
-                    self.status = 'pre_meta'
-                    self.remain_bytes = 4
-                    yield bytes()
 
 if __name__ == '__main__':
     reader = FileReader('../nvimdots')

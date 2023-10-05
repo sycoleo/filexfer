@@ -1,4 +1,3 @@
-from asyncio.tasks import wait_for
 import os
 import stat
 import time
@@ -17,6 +16,14 @@ class FileReader(object):
         fstat = os.stat(path)
         relpath = os.path.relpath(path, self.path)
         target = None
+
+        if (not is_subdir) and stat.S_ISREG(fstat.st_mode):
+            yield {
+                'path': self.dirname,
+                'stat': fstat,
+                'link_target': target
+            }
+            return
 
         if stat.S_ISLNK(fstat.st_mode):
             target = os.readlink(path)
@@ -85,10 +92,11 @@ class FileWriter(object):
             elif stat.S_ISLNK(mode):
                 os.symlink(path, meta.get('link_target'))
 
-            os.utime(path, times=(meta.get('stat').st_atime, meta.get('stat').st_mtime))
             os.chmod(path, stat.S_IMODE(mode))
+            os.utime(path, times=(meta.get('stat').st_atime, meta.get('stat').st_mtime))
         else:
             if self.verbose:
+                print('receiving', path)
                 print('xfer', path, end='')
             self.fd = open(path, 'wb')
             self.reg_meta = meta
@@ -98,15 +106,18 @@ class FileWriter(object):
         assert(self.fd != None)
         if data == bytes():
             size = self.reg_meta.get('stat').st_size
-            self.fd.close()
-            self.fd = None
-            self.reg_meta = None
             elapsed = time.time() - self.write_start
+            self.fd.close()
             if self.verbose:
                 print(
                     " %d bytes in %.1f s (%.3f MBps)"
                     % (size, elapsed, size / elapsed / 1000000)
                 )
+            path = os.path.join(self.path, self.reg_meta.get('path'))
+            os.chmod(path, stat.S_IMODE(self.reg_meta.get('stat').st_mode))
+            os.utime(path, time=(self.reg_meta.get('stat').st_atime, self.reg_meta.get('stat').st_mtime))
+            self.reg_meta = None
+            self.fd = None
             return
 
         self.fd.write(data)

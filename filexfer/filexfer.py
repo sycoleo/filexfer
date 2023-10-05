@@ -2,12 +2,13 @@ import sys
 import os
 import asyncio
 import json
+import datetime
 from uuid import uuid4
 from websockets.client import connect
-from aiortc import RTCPeerConnection
+from aiortc import RTCPeerConnection, RTCConfiguration
 from aiortc.contrib.signaling import object_to_string, object_from_string
-from files import FileReader, FileWriter
-from protocol import XferSender, XferReceiver
+from .files import FileReader, FileWriter
+from .protocol import XferSender, XferReceiver
 
 
 url = 'wss://transfer.zip/ws'
@@ -52,7 +53,7 @@ async def consume_signaling(pc, ws):
                 break
         else:
             if message.get('success') != True:
-                print('Error when signaling:\n', message)
+                print('Error when signaling:\n', message, datetime.datetime.now())
 
 
 async def run_receiver(pc, peerId, basedir):
@@ -136,7 +137,7 @@ async def run_sender(pc, send_path):
 def print_help():
     print('sender: filexfer dir/file\nreceiver: filexfer uuid [receive_path]')
 
-if __name__ == '__main__':
+def main():
     peerId = ''
     send_path = ''
     role = ''
@@ -159,9 +160,10 @@ if __name__ == '__main__':
         print_help()
         sys.exit(2)
 
-    pc = RTCPeerConnection()
+    config = RTCConfiguration([])
+    pc = RTCPeerConnection(config)
     if role == 'rcv':
-        coro = run_receiver(pc, peerId, 'test')
+        coro = run_receiver(pc, peerId, recv_dir)
     else:
         coro = run_sender(pc, send_path)
 
@@ -172,3 +174,5 @@ if __name__ == '__main__':
         pass
 
 
+if __name__ == '__main__':
+    main()
